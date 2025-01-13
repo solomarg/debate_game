@@ -4,66 +4,97 @@
   <meta charset="UTF-8" />
   <title>Manage Debate Dictionaries</title>
   <style>
+    /* Same pleasant design */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
     body {
+      font-family: "Arial", sans-serif;
+      background: linear-gradient(to right, #fbe7e7, #ffdcdc);
       text-align: center;
-      font-family: sans-serif;
-      margin: 2rem;
+      padding: 20px;
     }
     .container {
-      display: inline-block;
-      text-align: left;
-      padding: 1rem;
-      border: 1px solid #ccc;
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffffdd;
       border-radius: 10px;
-      max-width: 500px;
+      padding: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      text-align: left; /* We'll keep content left-aligned inside the container for clarity */
+    }
+    h1 {
+      color: #ff5c5c;
+      margin-bottom: 20px;
+      text-align: center;
     }
     label, select, input, button {
       display: block;
       margin: 0.5rem 0;
     }
     button {
+      background-color: #ff8585;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 20px;
       cursor: pointer;
-      padding: 0.5rem;
+      font-size: 1rem;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #e06b6b;
     }
     #dictionaryDisplay {
       margin-top: 1rem;
+      padding: 0.5rem;
+      background-color: #fff;
+      border-radius: 4px;
+    }
+    .note {
+      font-style: italic;
+      color: #666;
+      margin: 5px 0 10px;
     }
   </style>
 </head>
 <body>
   <h1>Manage Dictionaries</h1>
   <div class="container">
-    <!-- Show dictionaries -->
     <button id="showDictionariesBtn">Show Dictionaries</button>
     <div id="dictionaryDisplay"></div>
 
     <hr />
 
-    <!-- Add new words -->
     <h2>Add Words</h2>
     <label for="newWords">Enter words (comma separated):</label>
     <input type="text" id="newWords" placeholder="Mr. Bean, אבוקדו" />
     
-    <br />
     <label for="autoDetect">Language detection:</label>
     <input type="checkbox" id="autoDetect" checked />
-    <span>If checked, we guess the language by looking for Hebrew characters.</span>
-    <br /><br />
+    <span class="note">If checked, we guess the language by looking for Hebrew characters.</span>
 
     <label for="languageSelect">If not auto-detect, pick dictionary to update:</label>
     <select id="languageSelect">
       <option value="english">English</option>
       <option value="hebrew">Hebrew</option>
     </select>
-
     <button id="addWordsBtn">Add Words</button>
+
+    <hr />
+
+    <h2>Reset Database</h2>
+    <p class="note">Click to restore both dictionaries to default words.</p>
+    <button id="resetBtn">Reset Dictionaries</button>
   </div>
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
 
-  <!-- Your Firebase configuration (must match index.html) -->
+  <!-- Your Firebase configuration -->
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAayialkEZsC7rdYIm4k6lix4NLQZP9Qqg",
@@ -82,12 +113,26 @@
 
   <!-- Custom JS for manage.html -->
   <script>
+    // Default word arrays (10-15 in each language)
+    const defaultEnglishWords = [
+      "Mr. Bean", "flamingo", "eggplant", "gorilla", "banana",
+      "innovation", "technology", "pizza", "watermelon", "unicorn",
+      "debate", "goal", "pancake"
+    ];
+
+    const defaultHebrewWords = [
+      "משוגע", "דג", "ספה", "חללית", "אבוקדו",
+      "חציל", "מחשב", "פיצה", "רטוב", "פינגווין",
+      "ספר", "טכנולוגיה", "תות"
+    ];
+
     const dictionaryDisplay = document.getElementById("dictionaryDisplay");
     const showDictionariesBtn = document.getElementById("showDictionariesBtn");
     const newWordsInput = document.getElementById("newWords");
     const addWordsBtn = document.getElementById("addWordsBtn");
     const languageSelect = document.getElementById("languageSelect");
     const autoDetectCheckbox = document.getElementById("autoDetect");
+    const resetBtn = document.getElementById("resetBtn");
 
     // Helper function to detect Hebrew
     function isHebrew(word) {
@@ -150,8 +195,6 @@
         updates[selectedLang] = newWords;
       }
 
-      // Now we have two arrays: updates.english and updates.hebrew
-      // Let's update Firestore for each dictionary
       try {
         // ENGLISH
         if (updates.english.length > 0) {
@@ -160,6 +203,7 @@
             words: firebase.firestore.FieldValue.arrayUnion(...updates.english)
           });
         }
+
         // HEBREW
         if (updates.hebrew.length > 0) {
           const hebrewRef = db.collection("dictionaries").doc("hebrew");
@@ -173,6 +217,29 @@
       } catch (error) {
         console.error("Error updating Firestore:", error);
         alert("Failed to add words.");
+      }
+    });
+
+    // RESET DATABASE (overwrite with defaults)
+    resetBtn.addEventListener("click", async () => {
+      if (!confirm("Are you sure you want to reset the dictionaries to their default words?")) {
+        return;
+      }
+      try {
+        // Overwrite the 'english' doc
+        await db.collection("dictionaries").doc("english").set({
+          words: defaultEnglishWords
+        });
+        // Overwrite the 'hebrew' doc
+        await db.collection("dictionaries").doc("hebrew").set({
+          words: defaultHebrewWords
+        });
+
+        alert("Dictionaries successfully reset to default!");
+        dictionaryDisplay.innerHTML = "";
+      } catch (error) {
+        console.error("Error resetting dictionaries:", error);
+        alert("Failed to reset dictionaries.");
       }
     });
   </script>
