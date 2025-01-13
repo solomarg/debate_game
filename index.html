@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Random Word Selector</title>
+</head>
+<body>
+  <h1>Random Word Selector</h1>
+  <div id="word-list"></div>
+  
+  <script>
+    // Example word bank
+    const wordBank = [
+      "apple",
+      "banana",
+      "cat",
+      "dog",
+      "elephant",
+      "guitar",
+      "house",
+      "internet",
+      "jungle",
+      "kangaroo"
+    ];
+
+    // Function to get 5 random words
+    function getRandomWords() {
+      // We can shuffle the array and take the first five words
+      const shuffled = [...wordBank].sort(() => 0.5 - Math.random());
+      return shuffled.slice(0, 5);
+    }
+
+    // Display the words
+    const words = getRandomWords();
+    const wordListDiv = document.getElementById("word-list");
+    wordListDiv.innerHTML = words.join(", ");
+  </script>
+</body>
+</html>
