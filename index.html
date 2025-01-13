@@ -60,11 +60,34 @@
     #wordsDisplay {
       margin-top: 20px;
     }
+    #errorMessage {
+      margin-top: 20px;
+      color: red;
+      font-weight: bold;
+    }
+    /* Link to manage page */
+    .manage-link {
+      margin-top: 30px;
+      display: block;
+      color: #fff;
+      background-color: #ff8585;
+      padding: 10px;
+      width: 200px;
+      margin: 30px auto 0;
+      text-decoration: none;
+      text-align: center;
+      border-radius: 6px;
+      transition: background-color 0.3s ease;
+    }
+    .manage-link:hover {
+      background-color: #e06b6b;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Debate Words Game (Shared)</h1>
+
     <!-- USER FORM: Name + Language Selection -->
     <form id="userForm">
       <label for="userName">Enter your name:</label>
@@ -79,16 +102,34 @@
       <button type="submit">Get 5 Words</button>
     </form>
 
-    <!-- Display random words here -->
+    <!-- Display random words -->
     <div id="wordsDisplay"></div>
+
+    <!-- Display on-screen errors -->
+    <div id="errorMessage"></div>
+
+    <!-- Link to manage page -->
+    <a href="manage.html" class="manage-link">Manage Dictionaries</a>
   </div>
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+  <!-- Firebase (Modular) -->
+  <script type="module">
+    /****************************************
+     * 1) IMPORT FIREBASE (MODULAR)        *
+     ****************************************/
+    import { 
+      initializeApp 
+    } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
 
-  <!-- Your Firebase configuration -->
-  <script>
+    import {
+      getFirestore,
+      doc,
+      getDoc
+    } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+
+    /****************************************
+     * 2) FIREBASE CONFIG + INIT            *
+     ****************************************/
     const firebaseConfig = {
       apiKey: "AIzaSyAayialkEZsC7rdYIm4k6lix4NLQZP9Qqg",
       authDomain: "debategametechnion.firebaseapp.com",
@@ -98,47 +139,58 @@
       appId: "1:1000572030639:web:03f74e9c4006ba2e198e5a",
       measurementId: "G-32MCCNDGFT"
     };
-    firebase.initializeApp(firebaseConfig);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-    // Initialize Firestore
-    const db = firebase.firestore();
-  </script>
-
-  <!-- Custom JS for index.html -->
-  <script>
+    /****************************************
+     * 3) ELEMENT REFS + EVENT LISTENERS    *
+     ****************************************/
     const userForm = document.getElementById("userForm");
     const wordsDisplay = document.getElementById("wordsDisplay");
+    const errorMessage = document.getElementById("errorMessage");
 
     userForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      errorMessage.innerText = ""; // Clear old errors
+      wordsDisplay.innerHTML = ""; // Clear old words
+
       const userName = document.getElementById("userName").value.trim();
       const selectedLanguage = document.getElementById("languageSelect").value;
 
       try {
-        // Fetch the dictionary from Firestore
-        const docRef = db.collection("dictionaries").doc(selectedLanguage);
-        const docSnap = await docRef.get();
-        if (!docSnap.exists) {
-          alert("No dictionary found for language: " + selectedLanguage);
+        // 1) Reference the doc
+        const docRef = doc(db, "dictionaries", selectedLanguage);
+
+        // 2) Get the doc
+        const docSnap = await getDoc(docRef);
+
+        if (!docSnap.exists()) {
+          // If doc is missing, show an error
+          const msg = `No dictionary found for language: ${selectedLanguage}. 
+            (Try visiting Manage Dictionaries to initialize.)`;
+          console.error(msg);
+          errorMessage.textContent = msg;
           return;
         }
 
+        // 3) Extract words
         const data = docSnap.data();
         const wordArray = data.words || [];
 
         if (wordArray.length === 0) {
+          // No words found
           wordsDisplay.innerHTML = `
             <h2>Good luck, ${userName}!</h2>
-            <p>Oops, no words found in the <strong>${selectedLanguage}</strong> dictionary!</p>
+            <p>Oops, the <strong>${selectedLanguage}</strong> dictionary is empty!</p>
           `;
           return;
         }
 
-        // Shuffle and get 5 random words
+        // 4) Shuffle and get 5 random words
         const shuffled = [...wordArray].sort(() => 0.5 - Math.random());
         const randomWords = shuffled.slice(0, 5);
 
-        // Display them (fun text)
+        // 5) Display them
         wordsDisplay.innerHTML = `
           <h2>Good luck, ${userName}!</h2>
           <p>These are your words for today in <strong>${selectedLanguage}</strong>:</p>
@@ -146,7 +198,7 @@
         `;
       } catch (error) {
         console.error("Error fetching dictionary:", error);
-        alert("Failed to fetch words.");
+        errorMessage.textContent = "Failed to fetch words. Check console for details.";
       }
     });
   </script>
