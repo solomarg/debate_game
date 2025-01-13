@@ -2,37 +2,69 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Debate Words (Shared)</title>
+  <title>Debate Words Game (Shared)</title>
   <style>
+    /* Basic reset & pleasant design */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
     body {
+      font-family: "Arial", sans-serif;
+      background: linear-gradient(to right, #fbe7e7, #ffdcdc);
       text-align: center;
-      font-family: sans-serif;
-      margin: 2rem;
+      padding: 20px;
     }
     .container {
-      display: inline-block;
-      text-align: left;
-      padding: 1rem;
-      border: 1px solid #ccc;
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffffdd;
       border-radius: 10px;
-      max-width: 400px;
+      padding: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
-    label, select, input, button {
+    h1 {
+      color: #ff5c5c;
+      margin-bottom: 20px;
+    }
+    form {
+      margin-bottom: 20px;
+    }
+    label {
       display: block;
-      margin: 0.5rem 0;
+      margin: 10px 0 5px;
+      font-weight: bold;
+    }
+    input[type="text"], select {
+      padding: 8px;
+      width: 80%;
+      max-width: 300px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
     }
     button {
+      margin-top: 10px;
+      background-color: #ff8585;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 20px;
       cursor: pointer;
-      padding: 0.5rem;
+      font-size: 1rem;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #e06b6b;
     }
     #wordsDisplay {
-      margin-top: 1rem;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>Debate Words Game (Shared)</h1>
   <div class="container">
+    <h1>Debate Words Game (Shared)</h1>
     <!-- USER FORM: Name + Language Selection -->
     <form id="userForm">
       <label for="userName">Enter your name:</label>
@@ -55,15 +87,16 @@
   <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
 
-  <!-- Your Firebase configuration (replace with your real config) -->
+  <!-- Your Firebase configuration -->
   <script>
     const firebaseConfig = {
-      apiKey: "YOUR-API-KEY",
-      authDomain: "YOUR-PROJECT-ID.firebaseapp.com",
-      projectId: "YOUR-PROJECT-ID",
-      storageBucket: "YOUR-PROJECT-ID.appspot.com",
-      messagingSenderId: "YOUR-SENDER-ID",
-      appId: "YOUR-APP-ID"
+      apiKey: "AIzaSyAayialkEZsC7rdYIm4k6lix4NLQZP9Qqg",
+      authDomain: "debategametechnion.firebaseapp.com",
+      projectId: "debategametechnion",
+      storageBucket: "debategametechnion.firebasestorage.app",
+      messagingSenderId: "1000572030639",
+      appId: "1:1000572030639:web:03f74e9c4006ba2e198e5a",
+      measurementId: "G-32MCCNDGFT"
     };
     firebase.initializeApp(firebaseConfig);
 
@@ -76,7 +109,6 @@
     const userForm = document.getElementById("userForm");
     const wordsDisplay = document.getElementById("wordsDisplay");
 
-    // On form submit, fetch random 5 words from Firestore
     userForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const userName = document.getElementById("userName").value.trim();
@@ -96,8 +128,8 @@
 
         if (wordArray.length === 0) {
           wordsDisplay.innerHTML = `
-            <h2>Hello ${userName}!</h2>
-            <p>No words found in the ${selectedLanguage} dictionary!</p>
+            <h2>Good luck, ${userName}!</h2>
+            <p>Oops, no words found in the <strong>${selectedLanguage}</strong> dictionary!</p>
           `;
           return;
         }
@@ -106,10 +138,10 @@
         const shuffled = [...wordArray].sort(() => 0.5 - Math.random());
         const randomWords = shuffled.slice(0, 5);
 
-        // Display them
+        // Display them (fun text)
         wordsDisplay.innerHTML = `
-          <h2>Hello ${userName}!</h2>
-          <p>Your 5 random words in <strong>${selectedLanguage}</strong> are:</p>
+          <h2>Good luck, ${userName}!</h2>
+          <p>These are your words for today in <strong>${selectedLanguage}</strong>:</p>
           <p><em>${randomWords.join(" | ")}</em></p>
         `;
       } catch (error) {
