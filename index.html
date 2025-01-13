@@ -3,72 +3,167 @@
 <head>
   <meta charset="UTF-8" />
   <title>Debate Words Game</title>
+  <style>
+    /* Basic reset and body styling */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Arial", sans-serif;
+      background: linear-gradient(to right, #fbe7e7, #ffdcdc);
+      text-align: center;
+      padding: 20px;
+    }
+
+    /* Container to hold main content in the center */
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffffdd;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #ff5c5c;
+      margin-bottom: 20px;
+    }
+
+    form, .dictionary-section {
+      margin: 20px 0;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+      color: #444;
+    }
+
+    input[type="text"], select {
+      padding: 8px;
+      width: 80%;
+      max-width: 300px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      background-color: #ff8585;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #e06b6b;
+    }
+
+    #wordsDisplay, #dictionaryDisplay {
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    hr {
+      margin: 30px 0;
+      border: none;
+      height: 1px;
+      background-color: #ddd;
+    }
+
+    .note {
+      font-style: italic;
+      color: #666;
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
-  <h1>Debate Words Game at the Technion</h1>
-  
-  <!-- USER FORM: Name + Language Selection -->
-  <form id="userForm">
-    <label for="userName">Enter your name:</label>
-    <input type="text" id="userName" required />
+  <div class="container">
+    <h1>Debate Words Game at the Technion</h1>
     
-    <br /><br />
-    
-    <label for="languageSelect">Select language:</label>
-    <select id="languageSelect">
-      <option value="english">English</option>
-      <option value="hebrew">Hebrew</option>
-    </select>
-    
-    <br /><br />
-    
-    <button type="submit">Get 5 Words</button>
-  </form>
+    <!-- USER FORM: Name + Language Selection -->
+    <form id="userForm">
+      <label for="userName">Enter your name:</label>
+      <input type="text" id="userName" required placeholder="Your Name" />
+      
+      <br /><br />
+      
+      <label for="languageSelect">Select language (for the 5 words):</label>
+      <select id="languageSelect">
+        <option value="english">English</option>
+        <option value="hebrew">Hebrew</option>
+      </select>
+      
+      <br /><br />
+      
+      <button type="submit">Get 5 Words</button>
+    </form>
 
-  <br />
+    <!-- AREA FOR SHOWING THE 5 RANDOM WORDS -->
+    <div id="wordsDisplay"></div>
 
-  <!-- AREA FOR SHOWING THE 5 RANDOM WORDS -->
-  <div id="wordsDisplay"></div>
+    <hr />
 
-  <hr />
+    <!-- SECTION FOR DICTIONARY MANAGEMENT -->
+    <div class="dictionary-section">
+      <h2>Manage Dictionaries</h2>
+      
+      <!-- 1) SHOW DICTIONARY BUTTON -->
+      <button id="showDictionaryBtn">Show Dictionaries</button>
+      <div id="dictionaryDisplay"></div>
 
-  <!-- SECTION FOR DICTIONARY MANAGEMENT -->
-  <h2>Manage Dictionaries</h2>
-  
-  <!-- 1) SHOW DICTIONARY BUTTON -->
-  <button id="showDictionaryBtn">Show Dictionaries</button>
-  <div id="dictionaryDisplay"></div>
+      <br /><br />
 
-  <br /><br />
-
-  <!-- 2) ADD WORDS TO DICTIONARY -->
-  <label for="newWords">Add new words to selected dictionary (comma-separated):</label><br />
-  <input type="text" id="newWords" />
-  <button id="addWordsBtn">Add Words</button>
+      <!-- 2) ADD WORDS TO DICTIONARY -->
+      <label for="newWords">Add new words (comma-separated; Hebrew or English)</label>
+      <input type="text" id="newWords" placeholder="e.g. Mr. Bean, אבוקדו" />
+      <button id="addWordsBtn">Add Words</button>
+      <p class="note">
+        Hebrew words automatically go to the Hebrew dictionary.  
+        English words automatically go to the English dictionary.
+      </p>
+    </div>
+  </div>
 
   <script>
     /**********************************************
      * 1) LOAD DICTIONARIES FROM LOCAL STORAGE   *
      **********************************************/
-    // If there's a saved "dictionaries" object in Local Storage, use it.
-    // Otherwise, start with these default values:
+    // Default dictionaries if nothing in localStorage
     let dictionaries = JSON.parse(localStorage.getItem("dictionaries")) || {
       english: ["Mr. Bean", "eggplant", "flamingo", "gorilla", "banana"],
       hebrew: ["משוגע", "דג", "ספה", "חללית", "אבוקדו"]
     };
 
-    /**********************************
-     * 2) GET 5 RANDOM WORDS          *
-     **********************************/
+    /**********************************************
+     * LANGUAGE DETECTION FOR NEW WORDS          *
+     **********************************************/
+    // If a word contains any Hebrew character, we'll consider it Hebrew.
+    // Basic check using Unicode range for Hebrew letters: \u0590-\u05FF
+    function isHebrew(text) {
+      return /[\u0590-\u05FF]/.test(text);
+    }
+
+    /**********************************************
+     * 2) GET 5 RANDOM WORDS FROM A DICTIONARY   *
+     **********************************************/
     function getRandomWords(language, count = 5) {
-      // Make a copy of the array to avoid modifying the original
       const shuffled = [...dictionaries[language]].sort(() => 0.5 - Math.random());
       return shuffled.slice(0, count);
     }
 
-    /**********************************
-     * 3) HANDLE FORM SUBMISSION      *
-     **********************************/
+    /**********************************************
+     * 3) FORM SUBMISSION (GET 5 WORDS)          *
+     **********************************************/
     document.getElementById("userForm").addEventListener("submit", function (event) {
       event.preventDefault();
       const userName = document.getElementById("userName").value.trim();
@@ -82,13 +177,13 @@
       wordsDisplay.innerHTML = `
         <h2>Hello ${userName}!</h2>
         <p>Your 5 random words in <strong>${selectedLanguage}</strong> are:</p>
-        <p><em>${randomWords.join(", ")}</em></p>
+        <p><em>${randomWords.join(" | ")}</em></p>
       `;
     });
 
-    /**********************************
-     * 4) SHOW DICTIONARIES           *
-     **********************************/
+    /**********************************************
+     * 4) SHOW DICTIONARIES BUTTON               *
+     **********************************************/
     document.getElementById("showDictionaryBtn").addEventListener("click", function () {
       const dictionaryDisplay = document.getElementById("dictionaryDisplay");
       const englishWords = dictionaries.english.join(", ");
@@ -103,11 +198,10 @@
       `;
     });
 
-    /**********************************
-     * 5) ADD WORDS TO DICTIONARY     *
-     **********************************/
+    /**********************************************
+     * 5) ADD NEW WORDS (AUTO-DETECT LANGUAGE)   *
+     **********************************************/
     document.getElementById("addWordsBtn").addEventListener("click", function () {
-      const selectedLanguage = document.getElementById("languageSelect").value;
       const newWordsInput = document.getElementById("newWords").value.trim();
 
       if (!newWordsInput) {
@@ -118,8 +212,14 @@
       // Split input by commas, trim whitespace
       const newWords = newWordsInput.split(",").map(word => word.trim()).filter(Boolean);
 
-      // Add these new words to the selected dictionary
-      dictionaries[selectedLanguage].push(...newWords);
+      // Distribute each new word to the correct dictionary based on language detection
+      newWords.forEach(word => {
+        if (isHebrew(word)) {
+          dictionaries.hebrew.push(word);
+        } else {
+          dictionaries.english.push(word);
+        }
+      });
 
       // Save updated dictionaries to Local Storage
       localStorage.setItem("dictionaries", JSON.stringify(dictionaries));
@@ -127,7 +227,7 @@
       // Clear input
       document.getElementById("newWords").value = "";
       
-      alert(`Added words to the ${selectedLanguage} dictionary:\n${newWords.join(", ")}`);
+      alert(`Successfully added:\n${newWords.join(", ")}\n\nWords are placed in the correct dictionary based on language.`);
     });
   </script>
 </body>
