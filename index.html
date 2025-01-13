@@ -2,38 +2,133 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Random Word Selector</title>
+  <title>Debate Words Game</title>
 </head>
 <body>
-  <h1>Random Word Selector</h1>
-  <div id="word-list"></div>
+  <h1>Debate Words Game at the Technion</h1>
   
-  <script>
-    // Example word bank
-    const wordBank = [
-      "apple",
-      "banana",
-      "cat",
-      "dog",
-      "elephant",
-      "guitar",
-      "house",
-      "internet",
-      "jungle",
-      "kangaroo"
-    ];
+  <!-- USER FORM: Name + Language Selection -->
+  <form id="userForm">
+    <label for="userName">Enter your name:</label>
+    <input type="text" id="userName" required />
+    
+    <br /><br />
+    
+    <label for="languageSelect">Select language:</label>
+    <select id="languageSelect">
+      <option value="english">English</option>
+      <option value="hebrew">Hebrew</option>
+    </select>
+    
+    <br /><br />
+    
+    <button type="submit">Get 5 Words</button>
+  </form>
 
-    // Function to get 5 random words
-    function getRandomWords() {
-      // We can shuffle the array and take the first five words
-      const shuffled = [...wordBank].sort(() => 0.5 - Math.random());
-      return shuffled.slice(0, 5);
+  <br />
+
+  <!-- AREA FOR SHOWING THE 5 RANDOM WORDS -->
+  <div id="wordsDisplay"></div>
+
+  <hr />
+
+  <!-- SECTION FOR DICTIONARY MANAGEMENT -->
+  <h2>Manage Dictionaries</h2>
+  
+  <!-- 1) SHOW DICTIONARY BUTTON -->
+  <button id="showDictionaryBtn">Show Dictionaries</button>
+  <div id="dictionaryDisplay"></div>
+
+  <br /><br />
+
+  <!-- 2) ADD WORDS TO DICTIONARY -->
+  <label for="newWords">Add new words to selected dictionary (comma-separated):</label><br />
+  <input type="text" id="newWords" />
+  <button id="addWordsBtn">Add Words</button>
+
+  <script>
+    /**********************************************
+     * 1) LOAD DICTIONARIES FROM LOCAL STORAGE   *
+     **********************************************/
+    // If there's a saved "dictionaries" object in Local Storage, use it.
+    // Otherwise, start with these default values:
+    let dictionaries = JSON.parse(localStorage.getItem("dictionaries")) || {
+      english: ["Mr. Bean", "eggplant", "flamingo", "gorilla", "banana"],
+      hebrew: ["משוגע", "דג", "ספה", "חללית", "אבוקדו"]
+    };
+
+    /**********************************
+     * 2) GET 5 RANDOM WORDS          *
+     **********************************/
+    function getRandomWords(language, count = 5) {
+      // Make a copy of the array to avoid modifying the original
+      const shuffled = [...dictionaries[language]].sort(() => 0.5 - Math.random());
+      return shuffled.slice(0, count);
     }
 
-    // Display the words
-    const words = getRandomWords();
-    const wordListDiv = document.getElementById("word-list");
-    wordListDiv.innerHTML = words.join(", ");
+    /**********************************
+     * 3) HANDLE FORM SUBMISSION      *
+     **********************************/
+    document.getElementById("userForm").addEventListener("submit", function (event) {
+      event.preventDefault();
+      const userName = document.getElementById("userName").value.trim();
+      const selectedLanguage = document.getElementById("languageSelect").value;
+      
+      // Get 5 random words
+      const randomWords = getRandomWords(selectedLanguage, 5);
+
+      // Display them
+      const wordsDisplay = document.getElementById("wordsDisplay");
+      wordsDisplay.innerHTML = `
+        <h2>Hello ${userName}!</h2>
+        <p>Your 5 random words in <strong>${selectedLanguage}</strong> are:</p>
+        <p><em>${randomWords.join(", ")}</em></p>
+      `;
+    });
+
+    /**********************************
+     * 4) SHOW DICTIONARIES           *
+     **********************************/
+    document.getElementById("showDictionaryBtn").addEventListener("click", function () {
+      const dictionaryDisplay = document.getElementById("dictionaryDisplay");
+      const englishWords = dictionaries.english.join(", ");
+      const hebrewWords = dictionaries.hebrew.join(", ");
+      
+      dictionaryDisplay.innerHTML = `
+        <h3>English Dictionary</h3>
+        <p>${englishWords}</p>
+        
+        <h3>Hebrew Dictionary</h3>
+        <p>${hebrewWords}</p>
+      `;
+    });
+
+    /**********************************
+     * 5) ADD WORDS TO DICTIONARY     *
+     **********************************/
+    document.getElementById("addWordsBtn").addEventListener("click", function () {
+      const selectedLanguage = document.getElementById("languageSelect").value;
+      const newWordsInput = document.getElementById("newWords").value.trim();
+
+      if (!newWordsInput) {
+        alert("Please enter at least one word.");
+        return;
+      }
+
+      // Split input by commas, trim whitespace
+      const newWords = newWordsInput.split(",").map(word => word.trim()).filter(Boolean);
+
+      // Add these new words to the selected dictionary
+      dictionaries[selectedLanguage].push(...newWords);
+
+      // Save updated dictionaries to Local Storage
+      localStorage.setItem("dictionaries", JSON.stringify(dictionaries));
+
+      // Clear input
+      document.getElementById("newWords").value = "";
+      
+      alert(`Added words to the ${selectedLanguage} dictionary:\n${newWords.join(", ")}`);
+    });
   </script>
 </body>
 </html>
