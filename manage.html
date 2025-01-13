@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Manage Debate Dictionaries</title>
+  <style>
+    body {
+      text-align: center;
+      font-family: sans-serif;
+      margin: 2rem;
+    }
+    .container {
+      display: inline-block;
+      text-align: left;
+      padding: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      max-width: 500px;
+    }
+    label, select, input, button {
+      display: block;
+      margin: 0.5rem 0;
+    }
+    button {
+      cursor: pointer;
+      padding: 0.5rem;
+    }
+    #dictionaryDisplay {
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Manage Dictionaries</h1>
+  <div class="container">
+    <!-- Show dictionaries -->
+    <button id="showDictionariesBtn">Show Dictionaries</button>
+    <div id="dictionaryDisplay"></div>
+
+    <hr />
+
+    <!-- Add new words -->
+    <h2>Add Words</h2>
+    <label for="newWords">Enter words (comma separated):</label>
+    <input type="text" id="newWords" placeholder="Mr. Bean, אבוקדו" />
+    
+    <br />
+    <label for="autoDetect">Language detection:</label>
+    <input type="checkbox" id="autoDetect" checked />
+    <span>If checked, we guess the language by looking for Hebrew characters.</span>
+    <br /><br />
+
+    <label for="languageSelect">If not auto-detect, pick dictionary to update:</label>
+    <select id="languageSelect">
+      <option value="english">English</option>
+      <option value="hebrew">Hebrew</option>
+    </select>
+
+    <button id="addWordsBtn">Add Words</button>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+
+  <!-- Your Firebase configuration (must match index.html) -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAayialkEZsC7rdYIm4k6lix4NLQZP9Qqg",
+      authDomain: "debategametechnion.firebaseapp.com",
+      projectId: "debategametechnion",
+      storageBucket: "debategametechnion.firebasestorage.app",
+      messagingSenderId: "1000572030639",
+      appId: "1:1000572030639:web:03f74e9c4006ba2e198e5a",
+      measurementId: "G-32MCCNDGFT"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    // Firestore reference
+    const db = firebase.firestore();
+  </script>
+
+  <!-- Custom JS for manage.html -->
+  <script>
+    const dictionaryDisplay = document.getElementById("dictionaryDisplay");
+    const showDictionariesBtn = document.getElementById("showDictionariesBtn");
+    const newWordsInput = document.getElementById("newWords");
+    const addWordsBtn = document.getElementById("addWordsBtn");
+    const languageSelect = document.getElementById("languageSelect");
+    const autoDetectCheckbox = document.getElementById("autoDetect");
+
+    // Helper function to detect Hebrew
+    function isHebrew(word) {
+      return /[\u0590-\u05FF]/.test(word);
+    }
+
+    // SHOW DICTIONARIES
+    showDictionariesBtn.addEventListener("click", async () => {
+      try {
+        const englishDoc = await db.collection("dictionaries").doc("english").get();
+        const hebrewDoc = await db.collection("dictionaries").doc("hebrew").get();
+
+        if (!englishDoc.exists || !hebrewDoc.exists) {
+          dictionaryDisplay.innerHTML = `<p>Could not find dictionaries in Firestore.</p>`;
+          return;
+        }
+
+        const englishWords = englishDoc.data().words || [];
+        const hebrewWords = hebrewDoc.data().words || [];
+
+        dictionaryDisplay.innerHTML = `
+          <h3>English Dictionary</h3>
+          <p>${englishWords.join(", ")}</p>
+          
+          <h3>Hebrew Dictionary</h3>
+          <p>${hebrewWords.join(", ")}</p>
+        `;
+      } catch (error) {
+        console.error("Error fetching dictionaries:", error);
+        dictionaryDisplay.innerHTML = `<p>Error loading dictionaries.</p>`;
+      }
+    });
+
+    // ADD WORDS
+    addWordsBtn.addEventListener("click", async () => {
+      const inputValue = newWordsInput.value.trim();
+      if (!inputValue) {
+        alert("Please enter at least one word.");
+        return;
+      }
+
+      let newWords = inputValue.split(",").map(w => w.trim()).filter(Boolean);
+      const updates = {
+        english: [],
+        hebrew: []
+      };
+
+      if (autoDetectCheckbox.checked) {
+        // For each word, detect if it's Hebrew or English
+        newWords.forEach((word) => {
+          if (isHebrew(word)) {
+            updates.hebrew.push(word);
+          } else {
+            updates.english.push(word);
+          }
+        });
+      } else {
+        // Use the selected language from the dropdown
+        const selectedLang = languageSelect.value;
+        updates[selectedLang] = newWords;
+      }
+
+      // Now we have two arrays: updates.english and updates.hebrew
+      // Let's update Firestore for each dictionary
+      try {
+        // ENGLISH
+        if (updates.english.length > 0) {
+          const englishRef = db.collection("dictionaries").doc("english");
+          await englishRef.update({
+            words: firebase.firestore.FieldValue.arrayUnion(...updates.english)
+          });
+        }
+        // HEBREW
+        if (updates.hebrew.length > 0) {
+          const hebrewRef = db.collection("dictionaries").doc("hebrew");
+          await hebrewRef.update({
+            words: firebase.firestore.FieldValue.arrayUnion(...updates.hebrew)
+          });
+        }
+
+        alert("Words added successfully!");
+        newWordsInput.value = "";
+      } catch (error) {
+        console.error("Error updating Firestore:", error);
+        alert("Failed to add words.");
+      }
+    });
+  </script>
+</body>
+</html>
