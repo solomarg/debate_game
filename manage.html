@@ -52,6 +52,7 @@
       padding: 0.5rem;
       background-color: #fff;
       border-radius: 4px;
+      min-height: 50px;
     }
     .note {
       font-style: italic;
@@ -64,6 +65,27 @@
       height: 1px;
       background-color: #ddd;
     }
+    #errorMsg {
+      margin-top: 1rem;
+      color: red;
+      font-weight: bold;
+    }
+    .back-link {
+      margin-top: 30px;
+      display: block;
+      color: #fff;
+      background-color: #ff8585;
+      padding: 10px;
+      width: 200px;
+      margin: 30px auto 0;
+      text-align: center;
+      border-radius: 6px;
+      text-decoration: none;
+      transition: background-color 0.3s ease;
+    }
+    .back-link:hover {
+      background-color: #e06b6b;
+    }
   </style>
 </head>
 <body>
@@ -73,6 +95,7 @@
     <!-- 1) SHOW DICTIONARIES -->
     <button id="showDictionariesBtn">Show Dictionaries</button>
     <div id="dictionaryDisplay"></div>
+    <div id="errorMsg"></div>
 
     <hr />
 
@@ -100,6 +123,9 @@
     <button id="resetBtn">Reset Dictionaries</button>
 
   </div>
+
+  <!-- Link back to index.html -->
+  <a href="index.html" class="back-link">Back to Game</a>
 
   <!-- Firebase (Modular) -->
   <script type="module">
@@ -150,7 +176,7 @@
     ];
 
     /**************************************
-     * 4) UI ELEMENTS                     *
+     * 4) ELEMENT REFS & EVENT LISTENERS  *
      **************************************/
     const dictionaryDisplay = document.getElementById("dictionaryDisplay");
     const showDictionariesBtn = document.getElementById("showDictionariesBtn");
@@ -159,6 +185,7 @@
     const languageSelect = document.getElementById("languageSelect");
     const autoDetectCheckbox = document.getElementById("autoDetect");
     const resetBtn = document.getElementById("resetBtn");
+    const errorMsg = document.getElementById("errorMsg");
 
     /*****************************************
      * HELPER: DETECT HEBREW                 *
@@ -180,6 +207,7 @@
         // Use default words for english/hebrew
         const wordsToSet = (lang === "english") ? defaultEnglishWords : defaultHebrewWords;
         await setDoc(docRef, { words: wordsToSet });
+        console.log(`Initialized ${lang} dictionary with default words:`, wordsToSet);
         return wordsToSet;
       }
 
@@ -191,6 +219,9 @@
      * 1) SHOW DICTIONARIES BUTTON           *
      *****************************************/
     showDictionariesBtn.addEventListener("click", async () => {
+      errorMsg.innerText = "";
+      dictionaryDisplay.innerHTML = "";
+
       try {
         const [englishWords, hebrewWords] = await Promise.all([
           fetchOrInitDictionary("english"),
@@ -206,7 +237,7 @@
         `;
       } catch (error) {
         console.error("Error fetching dictionaries:", error);
-        dictionaryDisplay.innerHTML = `<p>Error loading dictionaries.</p>`;
+        errorMsg.innerText = "Error loading dictionaries. See console for details.";
       }
     });
 
@@ -214,6 +245,7 @@
      * 2) ADD WORDS                          *
      *****************************************/
     addWordsBtn.addEventListener("click", async () => {
+      errorMsg.innerText = "";
       const inputValue = newWordsInput.value.trim();
       if (!inputValue) {
         alert("Please enter at least one word.");
@@ -249,13 +281,15 @@
         // ENGLISH
         if (englishToAdd.length > 0) {
           const englishRef = doc(db, "dictionaries", "english");
-          // Ensure doc is initialized (fetchOrInit) so we don't overwrite with empty if missing
+          // Ensure doc is initialized so we don't overwrite with empty if missing
           await fetchOrInitDictionary("english");
           // Then update
           await updateDoc(englishRef, {
             words: arrayUnion(...englishToAdd)
           });
+          console.log("Added to English:", englishToAdd);
         }
+
         // HEBREW
         if (hebrewToAdd.length > 0) {
           const hebrewRef = doc(db, "dictionaries", "hebrew");
@@ -263,13 +297,14 @@
           await updateDoc(hebrewRef, {
             words: arrayUnion(...hebrewToAdd)
           });
+          console.log("Added to Hebrew:", hebrewToAdd);
         }
 
         alert("Words added successfully!");
         newWordsInput.value = "";
       } catch (error) {
         console.error("Error updating Firestore:", error);
-        alert("Failed to add words.");
+        errorMsg.innerText = "Failed to add words. See console for details.";
       }
     });
 
@@ -277,6 +312,7 @@
      * 3) RESET DATABASE (OVERWRITE)         *
      *****************************************/
     resetBtn.addEventListener("click", async () => {
+      errorMsg.innerText = "";
       if (!confirm("Are you sure you want to reset the dictionaries to their default words?")) {
         return;
       }
@@ -294,7 +330,7 @@
         dictionaryDisplay.innerHTML = "";
       } catch (error) {
         console.error("Error resetting dictionaries:", error);
-        alert("Failed to reset dictionaries.");
+        errorMsg.innerText = "Failed to reset dictionaries. See console for details.";
       }
     });
   </script>
