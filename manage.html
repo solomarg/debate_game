@@ -23,7 +23,7 @@
       border-radius: 10px;
       padding: 20px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-      text-align: left; /* We'll keep content left-aligned inside the container for clarity */
+      text-align: left; /* We'll keep content left-aligned inside for clarity */
     }
     h1 {
       color: #ff5c5c;
@@ -58,20 +58,29 @@
       color: #666;
       margin: 5px 0 10px;
     }
+    hr {
+      margin: 2rem 0;
+      border: none;
+      height: 1px;
+      background-color: #ddd;
+    }
   </style>
 </head>
 <body>
   <h1>Manage Dictionaries</h1>
   <div class="container">
+
+    <!-- 1) SHOW DICTIONARIES -->
     <button id="showDictionariesBtn">Show Dictionaries</button>
     <div id="dictionaryDisplay"></div>
 
     <hr />
 
+    <!-- 2) ADD WORDS -->
     <h2>Add Words</h2>
     <label for="newWords">Enter words (comma separated):</label>
     <input type="text" id="newWords" placeholder="Mr. Bean, אבוקדו" />
-    
+
     <label for="autoDetect">Language detection:</label>
     <input type="checkbox" id="autoDetect" checked />
     <span class="note">If checked, we guess the language by looking for Hebrew characters.</span>
@@ -85,17 +94,34 @@
 
     <hr />
 
+    <!-- 3) RESET DATABASE -->
     <h2>Reset Database</h2>
     <p class="note">Click to restore both dictionaries to default words.</p>
     <button id="resetBtn">Reset Dictionaries</button>
+
   </div>
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+  <!-- Firebase (Modular) -->
+  <script type="module">
+    /**************************************
+     * 1) IMPORT FIREBASE (MODULAR)      *
+     **************************************/
+    import { 
+      initializeApp 
+    } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
 
-  <!-- Your Firebase configuration -->
-  <script>
+    import {
+      getFirestore,
+      doc,
+      getDoc,
+      setDoc,
+      updateDoc,
+      arrayUnion
+    } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+
+    /**************************************
+     * 2) FIREBASE CONFIG + INIT          *
+     **************************************/
     const firebaseConfig = {
       apiKey: "AIzaSyAayialkEZsC7rdYIm4k6lix4NLQZP9Qqg",
       authDomain: "debategametechnion.firebaseapp.com",
@@ -105,15 +131,12 @@
       appId: "1:1000572030639:web:03f74e9c4006ba2e198e5a",
       measurementId: "G-32MCCNDGFT"
     };
-    firebase.initializeApp(firebaseConfig);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-    // Firestore reference
-    const db = firebase.firestore();
-  </script>
-
-  <!-- Custom JS for manage.html -->
-  <script>
-    // Default word arrays (10-15 in each language)
+    /**************************************
+     * 3) DEFAULT WORD ARRAYS             *
+     **************************************/
     const defaultEnglishWords = [
       "Mr. Bean", "flamingo", "eggplant", "gorilla", "banana",
       "innovation", "technology", "pizza", "watermelon", "unicorn",
@@ -126,6 +149,9 @@
       "ספר", "טכנולוגיה", "תות"
     ];
 
+    /**************************************
+     * 4) UI ELEMENTS                     *
+     **************************************/
     const dictionaryDisplay = document.getElementById("dictionaryDisplay");
     const showDictionariesBtn = document.getElementById("showDictionariesBtn");
     const newWordsInput = document.getElementById("newWords");
@@ -134,29 +160,47 @@
     const autoDetectCheckbox = document.getElementById("autoDetect");
     const resetBtn = document.getElementById("resetBtn");
 
-    // Helper function to detect Hebrew
-    function isHebrew(word) {
-      return /[\u0590-\u05FF]/.test(word);
+    /*****************************************
+     * HELPER: DETECT HEBREW                 *
+     *****************************************/
+    function isHebrew(text) {
+      return /[\u0590-\u05FF]/.test(text);
     }
 
-    // SHOW DICTIONARIES
+    /*****************************************
+     * HELPER: FETCH (OR INIT) A DICTIONARY  *
+     *****************************************/
+    async function fetchOrInitDictionary(lang) {
+      // doc reference
+      const docRef = doc(db, "dictionaries", lang);
+      const docSnap = await getDoc(docRef);
+
+      // If it doesn't exist or has no data, let's initialize
+      if (!docSnap.exists() || !docSnap.data().words || docSnap.data().words.length === 0) {
+        // Use default words for english/hebrew
+        const wordsToSet = (lang === "english") ? defaultEnglishWords : defaultHebrewWords;
+        await setDoc(docRef, { words: wordsToSet });
+        return wordsToSet;
+      }
+
+      // Otherwise, return existing words
+      return docSnap.data().words;
+    }
+
+    /*****************************************
+     * 1) SHOW DICTIONARIES BUTTON           *
+     *****************************************/
     showDictionariesBtn.addEventListener("click", async () => {
       try {
-        const englishDoc = await db.collection("dictionaries").doc("english").get();
-        const hebrewDoc = await db.collection("dictionaries").doc("hebrew").get();
-
-        if (!englishDoc.exists || !hebrewDoc.exists) {
-          dictionaryDisplay.innerHTML = `<p>Could not find dictionaries in Firestore.</p>`;
-          return;
-        }
-
-        const englishWords = englishDoc.data().words || [];
-        const hebrewWords = hebrewDoc.data().words || [];
+        const [englishWords, hebrewWords] = await Promise.all([
+          fetchOrInitDictionary("english"),
+          fetchOrInitDictionary("hebrew")
+        ]);
 
         dictionaryDisplay.innerHTML = `
           <h3>English Dictionary</h3>
           <p>${englishWords.join(", ")}</p>
-          
+
           <h3>Hebrew Dictionary</h3>
           <p>${hebrewWords.join(", ")}</p>
         `;
@@ -166,7 +210,9 @@
       }
     });
 
-    // ADD WORDS
+    /*****************************************
+     * 2) ADD WORDS                          *
+     *****************************************/
     addWordsBtn.addEventListener("click", async () => {
       const inputValue = newWordsInput.value.trim();
       if (!inputValue) {
@@ -175,40 +221,47 @@
       }
 
       let newWords = inputValue.split(",").map(w => w.trim()).filter(Boolean);
-      const updates = {
-        english: [],
-        hebrew: []
-      };
+
+      // We'll store them separately
+      let englishToAdd = [];
+      let hebrewToAdd = [];
 
       if (autoDetectCheckbox.checked) {
         // For each word, detect if it's Hebrew or English
         newWords.forEach((word) => {
           if (isHebrew(word)) {
-            updates.hebrew.push(word);
+            hebrewToAdd.push(word);
           } else {
-            updates.english.push(word);
+            englishToAdd.push(word);
           }
         });
       } else {
         // Use the selected language from the dropdown
         const selectedLang = languageSelect.value;
-        updates[selectedLang] = newWords;
+        if (selectedLang === "english") {
+          englishToAdd = newWords;
+        } else {
+          hebrewToAdd = newWords;
+        }
       }
 
       try {
         // ENGLISH
-        if (updates.english.length > 0) {
-          const englishRef = db.collection("dictionaries").doc("english");
-          await englishRef.update({
-            words: firebase.firestore.FieldValue.arrayUnion(...updates.english)
+        if (englishToAdd.length > 0) {
+          const englishRef = doc(db, "dictionaries", "english");
+          // Ensure doc is initialized (fetchOrInit) so we don't overwrite with empty if missing
+          await fetchOrInitDictionary("english");
+          // Then update
+          await updateDoc(englishRef, {
+            words: arrayUnion(...englishToAdd)
           });
         }
-
         // HEBREW
-        if (updates.hebrew.length > 0) {
-          const hebrewRef = db.collection("dictionaries").doc("hebrew");
-          await hebrewRef.update({
-            words: firebase.firestore.FieldValue.arrayUnion(...updates.hebrew)
+        if (hebrewToAdd.length > 0) {
+          const hebrewRef = doc(db, "dictionaries", "hebrew");
+          await fetchOrInitDictionary("hebrew");
+          await updateDoc(hebrewRef, {
+            words: arrayUnion(...hebrewToAdd)
           });
         }
 
@@ -220,18 +273,20 @@
       }
     });
 
-    // RESET DATABASE (overwrite with defaults)
+    /*****************************************
+     * 3) RESET DATABASE (OVERWRITE)         *
+     *****************************************/
     resetBtn.addEventListener("click", async () => {
       if (!confirm("Are you sure you want to reset the dictionaries to their default words?")) {
         return;
       }
       try {
         // Overwrite the 'english' doc
-        await db.collection("dictionaries").doc("english").set({
+        await setDoc(doc(db, "dictionaries", "english"), {
           words: defaultEnglishWords
         });
         // Overwrite the 'hebrew' doc
-        await db.collection("dictionaries").doc("hebrew").set({
+        await setDoc(doc(db, "dictionaries", "hebrew"), {
           words: defaultHebrewWords
         });
 
