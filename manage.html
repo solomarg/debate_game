@@ -312,25 +312,31 @@
      * 3) RESET DATABASE (OVERWRITE)         *
      *****************************************/
     resetBtn.addEventListener("click", async () => {
-      errorMsg.innerText = "";
+      errorMsg.innerText = ""; // Clear previous errors
       if (!confirm("Are you sure you want to reset the dictionaries to their default words?")) {
         return;
       }
+    
       try {
-        // Overwrite the 'english' doc
+        // Attempt to reset the English dictionary
+        console.log("Resetting English dictionary...");
         await setDoc(doc(db, "dictionaries", "english"), {
           words: defaultEnglishWords
         });
-        // Overwrite the 'hebrew' doc
+        console.log("English dictionary reset successfully.");
+    
+        // Attempt to reset the Hebrew dictionary
+        console.log("Resetting Hebrew dictionary...");
         await setDoc(doc(db, "dictionaries", "hebrew"), {
           words: defaultHebrewWords
         });
-
+        console.log("Hebrew dictionary reset successfully.");
+    
         alert("Dictionaries successfully reset to default!");
-        dictionaryDisplay.innerHTML = "";
+        dictionaryDisplay.innerHTML = ""; // Clear the displayed dictionaries
       } catch (error) {
         console.error("Error resetting dictionaries:", error);
-        errorMsg.innerText = "Failed to reset dictionaries. See console for details.";
+        errorMsg.innerText = `Failed to reset dictionaries. Error: ${error.message}`;
       }
     });
   </script>
