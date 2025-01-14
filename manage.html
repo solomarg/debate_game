@@ -102,7 +102,7 @@
     <!-- 2) ADD WORDS -->
     <h2>Add Words</h2>
     <label for="newWords">Enter words (comma separated):</label>
-    <input type="text" id="newWords" placeholder="Mr. Bean, אבוקדו,חילזון" />
+    <input type="text" id="newWords" placeholder="Mr. Bean, אבוקדו, חילזון, green man, איש ירוק" />
 
     <button id="addWordsBtn">Add Words</button>
 
@@ -143,6 +143,25 @@
     };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+
+    /**************************************
+     * 2B) Default word lists
+     **************************************/
+    const defaultEnglishWords = [
+      "Mr. Bean", "flamingo", "eggplant", "gorilla", "banana", "chess",
+      "testicle", "pizza", "watermelon", "unicorn", "junky", "flat earth",
+      "pancake", "Love Poem", "Simha Rotman", "Simba", "Gigolo"
+    ];
+
+    const defaultHebrewWords = [
+      "משוגע", "קרפיון", "שזלונג", "מעבורת חלל", "אבוקדו קשה", "חציל",
+      "מחשבטור", "חמודי", "רטוב", "פינגווין", "קופים ארקטים", "קישוא",
+      "תות", "דודו פארוק", "אשך", "שחלה", "וריקוצלה", "ציפורן חודרנית",
+      "דיברגנץ", "הונלולו", "עכוז", "משגל", "ברוקלין 99", "כדילהלן",
+      "נומינלי", "מריונטה", "הדיוטות", "תלתלים", "דרוויניזם", "נס וסטילה",
+      "נפוליאן", "ברון", "יומרני", "סריג", "זמרה", "צפתית", "מאסטרו",
+      "דיקטטורה", "קתטר"
+    ];
 
     /**************************************
      * Utility: Ensure doc with array exists
@@ -194,15 +213,15 @@
     const newWordsInput = document.getElementById("newWords");
     const addWordsBtn = document.getElementById("addWordsBtn");
 
-    // Helper to detect Hebrew
+    // Helper to detect Hebrew (allows Hebrew letters + spaces)
     function isHebrew(text) {
-      // If the entire word is in Hebrew range
-      return /^[\u0590-\u05FF]+$/.test(text);
+      // Only Hebrew chars (range \u0590-\u05FF) plus whitespace
+      return /^[\u0590-\u05FF\s]+$/.test(text);
     }
 
-    // Helper to detect English
+    // Helper to detect English (no Hebrew chars at all)
     function isEnglish(text) {
-      // If the entire word has no Hebrew range characters
+      // If there's NO Hebrew character, we treat it as English
       return !/[\u0590-\u05FF]/.test(text);
     }
 
@@ -214,11 +233,16 @@
       if (inputValue.toUpperCase() === "RESET DATABASE") {
         if (confirm("Are you sure you want to reset both dictionaries?")) {
           try {
-            // Reset English
-            await setDoc(doc(db, "dictionaries", "english"), { words: [] });
-            // Reset Hebrew
-            await setDoc(doc(db, "dictionaries", "hebrew"), { words: [] });
-            alert("Dictionaries have been reset!");
+            // Reset English to default
+            await setDoc(doc(db, "dictionaries", "english"), {
+              words: defaultEnglishWords
+            });
+            // Reset Hebrew to default
+            await setDoc(doc(db, "dictionaries", "hebrew"), {
+              words: defaultHebrewWords
+            });
+
+            alert("Dictionaries have been reset to default words!");
           } catch (error) {
             console.error("Error resetting database:", error);
             errorMsg.innerText = "Failed to reset database. Check console for details.";
@@ -233,7 +257,7 @@
         return;
       }
 
-      // Split and process input
+      // Split and process input by commas
       let newWords = inputValue.split(",").map(w => w.trim()).filter(Boolean);
 
       let englishToAdd = [];
@@ -246,7 +270,7 @@
         } else if (isEnglish(word)) {
           englishToAdd.push(word);
         } else {
-          // Mixed or unknown
+          // Mixed or contains both Hebrew & non-Hebrew
           errorMsg.innerText = `Error: the word "${word}" is mixed or invalid. No words added.`;
           return;
         }
