@@ -190,12 +190,20 @@
         const shuffled = [...wordArray].sort(() => 0.5 - Math.random());
         const randomWords = shuffled.slice(0, 5);
 
-        // 5) Display them
-        wordsDisplay.innerHTML = `
-          <h2>Good luck, ${userName}!</h2>
-          <p>These are your words for today in <strong>${selectedLanguage}</strong>:</p>
-          <p><em>${randomWords.join(" | ")}</em></p>
-        `;
+        // 5) Display based on language
+        if (selectedLanguage === "english") {
+          wordsDisplay.innerHTML = `
+            <h2>Good Luck ${userName}! <3</h2>
+            <p>These are your words for today:</p>
+            <p><em>${randomWords.join(" | ")}</em></p>
+          `;
+        } else if (selectedLanguage === "hebrew") {
+          wordsDisplay.innerHTML = `
+            <h2>בהצלחה ${userName}!</h2>
+            <p>המילים שלך הם.... (תופים,תופים,תופים, התרגשותתת):</p>
+            <p><em>${randomWords.join(" | ")}</em></p>
+          `;
+        }
       } catch (error) {
         console.error("Error fetching dictionary:", error);
         errorMessage.textContent = "Failed to fetch words. Check console for details.";
