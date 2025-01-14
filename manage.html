@@ -154,74 +154,73 @@
     const db = getFirestore(app);
 
     /**************************************
-     * 3) DEFAULT WORD ARRAYS             *
+     * 3) ADD WORDS FUNCTIONALITY         *
      **************************************/
-    const defaultEnglishWords = [
-      "Mr. Bean", "flamingo", "eggplant", "gorilla", "banana",
-      "chess", "testicle", "pizza", "watermelon", "unicorn",
-      "junky", "flat earth", "pancake", "Love Poem", "Simha Rotman", 
-      "Simba", "Gigolo"
-    ];
-    
-    const defaultHebrewWords = [
-      "משוגע", "קרפיון", "שזלונג", "מעבורת חלל", "אבוקדו קשה",
-      "חציל", "מחשבטור", "חמודי", "רטוב", "פינגווין",
-      "קופים ארקטים", "קישוא", "תות", "דודו פארוק",
-      "אשך", "שחלה", "וריקוצלה", "ציפורן חודרנית", "דיברגנץ",
-      "הונלולו", "עכוז", "משגל", "ברוקלין 99", "כדילהלן",
-      "נומינלי", "מריונטה", "הדיוטות", "תלתלים", "דרוויניזם",
-      "נס וסטילה", "נפוליאן", "ברון", "יומרני", "סריג",
-      "זמרה", "צפתית", "מאסטרו", "דיקטטורה", "קתטר",
-      "קרפדה", "הפרשת חלה", "פניצילין", "רוזמרין", "ברולטה"
-    ];
-
-    /**************************************
-     * 4) HELPER: FETCH OR INIT DICTIONARY *
-     **************************************/
-    async function fetchOrInitDictionary(lang) {
-      try {
-        const docRef = doc(db, "dictionaries", lang);
-        const docSnap = await getDoc(docRef);
-
-        if (!docSnap.exists() || !docSnap.data().words || docSnap.data().words.length === 0) {
-          const defaultWords = lang === "english" ? defaultEnglishWords : defaultHebrewWords;
-          await setDoc(docRef, { words: defaultWords });
-          return defaultWords;
-        }
-
-        return docSnap.data().words;
-      } catch (error) {
-        console.error(`Error fetching ${lang} dictionary:`, error);
-        throw error;
-      }
-    }
-
-    /*****************************************
-     * 5) SHOW DICTIONARIES BUTTON HANDLER   *
-     *****************************************/
-    const dictionaryDisplay = document.getElementById("dictionaryDisplay");
-    const showDictionariesBtn = document.getElementById("showDictionariesBtn");
+    const newWordsInput = document.getElementById("newWords");
+    const addWordsBtn = document.getElementById("addWordsBtn");
+    const autoDetectCheckbox = document.getElementById("autoDetect");
+    const languageSelect = document.getElementById("languageSelect");
     const errorMsg = document.getElementById("errorMsg");
 
-    showDictionariesBtn.addEventListener("click", async () => {
-      errorMsg.innerText = "";
-      dictionaryDisplay.innerHTML = "";
+    addWordsBtn.addEventListener("click", async () => {
+      errorMsg.innerText = ""; // Clear previous error messages
+      const inputValue = newWordsInput.value.trim(); // Get input
+
+      if (!inputValue) {
+        alert("Please enter at least one word.");
+        return;
+      }
+
+      // Split and process input
+      let newWords = inputValue.split(",").map(w => w.trim()).filter(Boolean);
+
+      // Separate into English and Hebrew
+      let englishToAdd = [];
+      let hebrewToAdd = [];
+
+      if (autoDetectCheckbox.checked) {
+        // Auto-detect language based on characters
+        newWords.forEach((word) => {
+          if (/[\u0590-\u05FF]/.test(word)) {
+            hebrewToAdd.push(word);
+          } else {
+            englishToAdd.push(word);
+          }
+        });
+      } else {
+        // Use selected language
+        const selectedLang = languageSelect.value;
+        if (selectedLang === "english") {
+          englishToAdd = newWords;
+        } else {
+          hebrewToAdd = newWords;
+        }
+      }
 
       try {
-        const [englishWords, hebrewWords] = await Promise.all([
-          fetchOrInitDictionary("english"),
-          fetchOrInitDictionary("hebrew"),
-        ]);
+        // Add to English dictionary
+        if (englishToAdd.length > 0) {
+          const englishRef = doc(db, "dictionaries", "english");
+          await updateDoc(englishRef, {
+            words: arrayUnion(...englishToAdd),
+          });
+          console.log("Added to English dictionary:", englishToAdd);
+        }
 
-        dictionaryDisplay.innerHTML = `
-          <h3>English Dictionary</h3>
-          <p>${englishWords.join(", ")}</p>
-          <h3>Hebrew Dictionary</h3>
-          <p>${hebrewWords.join(", ")}</p>
-        `;
+        // Add to Hebrew dictionary
+        if (hebrewToAdd.length > 0) {
+          const hebrewRef = doc(db, "dictionaries", "hebrew");
+          await updateDoc(hebrewRef, {
+            words: arrayUnion(...hebrewToAdd),
+          });
+          console.log("Added to Hebrew dictionary:", hebrewToAdd);
+        }
+
+        alert("Words added successfully!");
+        newWordsInput.value = ""; // Clear input field
       } catch (error) {
-        console.error("Error showing dictionaries:", error);
-        errorMsg.innerText = "Failed to load dictionaries. Check console for details.";
+        console.error("Error adding words:", error);
+        errorMsg.innerText = "Failed to add words. Check console for details.";
       }
     });
   </script>
