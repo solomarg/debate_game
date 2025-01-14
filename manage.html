@@ -34,6 +34,12 @@
       display: block;
       margin: 0.5rem 0;
     }
+    input[type="text"] {
+      padding: 8px;
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
     button {
       background-color: #ff8585;
       color: #fff;
@@ -117,10 +123,10 @@
 
     <hr />
 
-    <!-- 3) RESET DATABASE -->
-    <h2>Reset Database</h2>
-    <p class="note">Click to restore both dictionaries to default words.</p>
-    <button id="resetBtn">Reset Dictionaries</button>
+    <!-- RESET DATABASE BY TEXT -->
+    <h2>Reset Database by Text</h2>
+    <p class="note">Type "RESET DATABASE" below to reset dictionaries to defaults:</p>
+    <input type="text" id="resetInput" placeholder="Type RESET DATABASE here..." />
 
   </div>
 
@@ -182,8 +188,6 @@
       "קרפדה", "הפרשת חלה", "פניצילין", "רוזמרין", "ברולטה"
     ];
 
-
-
     /**************************************
      * 4) ELEMENT REFS & EVENT LISTENERS  *
      **************************************/
@@ -191,161 +195,50 @@
     const showDictionariesBtn = document.getElementById("showDictionariesBtn");
     const newWordsInput = document.getElementById("newWords");
     const addWordsBtn = document.getElementById("addWordsBtn");
-    const languageSelect = document.getElementById("languageSelect");
     const autoDetectCheckbox = document.getElementById("autoDetect");
-    const resetBtn = document.getElementById("resetBtn");
+    const resetInput = document.getElementById("resetInput");
     const errorMsg = document.getElementById("errorMsg");
-
-    /*****************************************
-     * HELPER: DETECT HEBREW                 *
-     *****************************************/
-    function isHebrew(text) {
-      return /[\u0590-\u05FF]/.test(text);
-    }
 
     /*****************************************
      * HELPER: FETCH (OR INIT) A DICTIONARY  *
      *****************************************/
     async function fetchOrInitDictionary(lang) {
-      // doc reference
       const docRef = doc(db, "dictionaries", lang);
       const docSnap = await getDoc(docRef);
 
-      // If it doesn't exist or has no data, let's initialize
       if (!docSnap.exists() || !docSnap.data().words || docSnap.data().words.length === 0) {
-        // Use default words for english/hebrew
-        const wordsToSet = (lang === "english") ? defaultEnglishWords : defaultHebrewWords;
+        const wordsToSet = lang === "english" ? defaultEnglishWords : defaultHebrewWords;
         await setDoc(docRef, { words: wordsToSet });
-        console.log(`Initialized ${lang} dictionary with default words:`, wordsToSet);
         return wordsToSet;
       }
 
-      // Otherwise, return existing words
       return docSnap.data().words;
     }
 
     /*****************************************
-     * 1) SHOW DICTIONARIES BUTTON           *
+     * RESET DATABASE BASED ON INPUT TEXT    *
      *****************************************/
-    showDictionariesBtn.addEventListener("click", async () => {
-      errorMsg.innerText = "";
-      dictionaryDisplay.innerHTML = "";
-
-      try {
-        const [englishWords, hebrewWords] = await Promise.all([
-          fetchOrInitDictionary("english"),
-          fetchOrInitDictionary("hebrew")
-        ]);
-
-        dictionaryDisplay.innerHTML = `
-          <h3>English Dictionary</h3>
-          <p>${englishWords.join(", ")}</p>
-
-          <h3>Hebrew Dictionary</h3>
-          <p>${hebrewWords.join(", ")}</p>
-        `;
-      } catch (error) {
-        console.error("Error fetching dictionaries:", error);
-        errorMsg.innerText = "Error loading dictionaries. See console for details.";
-      }
-    });
-
-    /*****************************************
-     * 2) ADD WORDS                          *
-     *****************************************/
-    addWordsBtn.addEventListener("click", async () => {
-      errorMsg.innerText = "";
-      const inputValue = newWordsInput.value.trim();
-      if (!inputValue) {
-        alert("Please enter at least one word.");
-        return;
-      }
-
-      let newWords = inputValue.split(",").map(w => w.trim()).filter(Boolean);
-
-      // We'll store them separately
-      let englishToAdd = [];
-      let hebrewToAdd = [];
-
-      if (autoDetectCheckbox.checked) {
-        // For each word, detect if it's Hebrew or English
-        newWords.forEach((word) => {
-          if (isHebrew(word)) {
-            hebrewToAdd.push(word);
-          } else {
-            englishToAdd.push(word);
-          }
-        });
-      } else {
-        // Use the selected language from the dropdown
-        const selectedLang = languageSelect.value;
-        if (selectedLang === "english") {
-          englishToAdd = newWords;
-        } else {
-          hebrewToAdd = newWords;
+    resetInput.addEventListener("input", async (e) => {
+      if (e.target.value.trim().toUpperCase() === "RESET DATABASE") {
+        if (!confirm("Are you sure you want to reset the dictionaries to default?")) {
+          return;
         }
-      }
 
-      try {
-        // ENGLISH
-        if (englishToAdd.length > 0) {
-          const englishRef = doc(db, "dictionaries", "english");
-          // Ensure doc is initialized so we don't overwrite with empty if missing
-          await fetchOrInitDictionary("english");
-          // Then update
-          await updateDoc(englishRef, {
-            words: arrayUnion(...englishToAdd)
+        try {
+          await setDoc(doc(db, "dictionaries", "english"), {
+            words: defaultEnglishWords
           });
-          console.log("Added to English:", englishToAdd);
-        }
 
-        // HEBREW
-        if (hebrewToAdd.length > 0) {
-          const hebrewRef = doc(db, "dictionaries", "hebrew");
-          await fetchOrInitDictionary("hebrew");
-          await updateDoc(hebrewRef, {
-            words: arrayUnion(...hebrewToAdd)
+          await setDoc(doc(db, "dictionaries", "hebrew"), {
+            words: defaultHebrewWords
           });
-          console.log("Added to Hebrew:", hebrewToAdd);
+
+          alert("Dictionaries successfully reset to default!");
+          resetInput.value = ""; // Clear input after reset
+        } catch (error) {
+          console.error("Error resetting dictionaries:", error);
+          errorMsg.innerText = "Failed to reset dictionaries. See console for details.";
         }
-
-        alert("Words added successfully!");
-        newWordsInput.value = "";
-      } catch (error) {
-        console.error("Error updating Firestore:", error);
-        errorMsg.innerText = "Failed to add words. See console for details.";
-      }
-    });
-
-    /*****************************************
-     * 3) RESET DATABASE (OVERWRITE)         *
-     *****************************************/
-    resetBtn.addEventListener("click", async () => {
-      errorMsg.innerText = ""; // Clear previous errors
-      if (!confirm("Are you sure you want to reset the dictionaries to their default words?")) {
-        return;
-      }
-    
-      try {
-        // Attempt to reset the English dictionary
-        console.log("Resetting English dictionary...");
-        await setDoc(doc(db, "dictionaries", "english"), {
-          words: defaultEnglishWords
-        });
-        console.log("English dictionary reset successfully.");
-    
-        // Attempt to reset the Hebrew dictionary
-        console.log("Resetting Hebrew dictionary...");
-        await setDoc(doc(db, "dictionaries", "hebrew"), {
-          words: defaultHebrewWords
-        });
-        console.log("Hebrew dictionary reset successfully.");
-    
-        alert("Dictionaries successfully reset to default!");
-        dictionaryDisplay.innerHTML = ""; // Clear the displayed dictionaries
-      } catch (error) {
-        console.error("Error resetting dictionaries:", error);
-        errorMsg.innerText = `Failed to reset dictionaries. Error: ${error.message}`;
       }
     });
   </script>
