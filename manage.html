@@ -23,14 +23,14 @@
       border-radius: 10px;
       padding: 20px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-      text-align: left; /* We'll keep content left-aligned inside for clarity */
+      text-align: left;
     }
     h1 {
       color: #ff5c5c;
       margin-bottom: 20px;
       text-align: center;
     }
-    label, select, input, button {
+    label, input, button {
       display: block;
       margin: 0.5rem 0;
     }
@@ -102,17 +102,8 @@
     <!-- 2) ADD WORDS -->
     <h2>Add Words</h2>
     <label for="newWords">Enter words (comma separated):</label>
-    <input type="text" id="newWords" placeholder="Mr. Bean, אבוקדו" />
+    <input type="text" id="newWords" placeholder="Mr. Bean, אבוקדו, RESET DATABASE" />
 
-    <label for="autoDetect">Language detection:</label>
-    <input type="checkbox" id="autoDetect" checked />
-    <span class="note">If checked, we guess the language by looking for Hebrew characters.</span>
-
-    <label for="languageSelect">If not auto-detect, pick dictionary to update:</label>
-    <select id="languageSelect">
-      <option value="english">English</option>
-      <option value="hebrew">Hebrew</option>
-    </select>
     <button id="addWordsBtn">Add Words</button>
 
   </div>
@@ -142,29 +133,100 @@
      * 2) FIREBASE CONFIG + INIT          *
      **************************************/
     const firebaseConfig = {
-      apiKey: "AIzaSyAayialkEZsC7rdYIm4k6lix4NLQZP9Qqg",
-      authDomain: "debategametechnion.firebaseapp.com",
-      projectId: "debategametechnion",
-      storageBucket: "debategametechnion.firebasestorage.app",
-      messagingSenderId: "1000572030639",
-      appId: "1:1000572030639:web:03f74e9c4006ba2e198e5a",
-      measurementId: "G-32MCCNDGFT"
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_BUCKET",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID",
+      measurementId: "YOUR_MEASUREMENT_ID"
     };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
     /**************************************
-     * 3) ADD WORDS FUNCTIONALITY         *
+     * Utility: Ensure doc with array exists
+     **************************************/
+    async function ensureDictionaryExists(language) {
+      const ref = doc(db, "dictionaries", language);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        await setDoc(ref, { words: [] });
+      }
+      return ref;
+    }
+
+    /**************************************
+     * 3) SHOW DICTIONARIES
+     **************************************/
+    const showDictionariesBtn = document.getElementById("showDictionariesBtn");
+    const dictionaryDisplay = document.getElementById("dictionaryDisplay");
+    const errorMsg = document.getElementById("errorMsg");
+
+    showDictionariesBtn.addEventListener("click", async () => {
+      dictionaryDisplay.innerHTML = "... loading ...";
+      errorMsg.innerText = "";
+      try {
+        const englishRef = await ensureDictionaryExists("english");
+        const hebrewRef  = await ensureDictionaryExists("hebrew");
+        
+        const englishSnap = await getDoc(englishRef);
+        const hebrewSnap  = await getDoc(hebrewRef);
+
+        const englishWords = englishSnap.data().words || [];
+        const hebrewWords  = hebrewSnap.data().words || [];
+
+        dictionaryDisplay.innerHTML = `
+          <h3>English Words:</h3>
+          <p>${englishWords.join(", ")}</p>
+          <h3>Hebrew Words:</h3>
+          <p>${hebrewWords.join(", ")}</p>
+        `;
+      } catch (error) {
+        dictionaryDisplay.innerHTML = "Error loading dictionaries.";
+        console.error("Error loading dictionaries:", error);
+      }
+    });
+
+    /**************************************
+     * 4) ADD WORDS FUNCTIONALITY
      **************************************/
     const newWordsInput = document.getElementById("newWords");
     const addWordsBtn = document.getElementById("addWordsBtn");
-    const autoDetectCheckbox = document.getElementById("autoDetect");
-    const languageSelect = document.getElementById("languageSelect");
-    const errorMsg = document.getElementById("errorMsg");
+
+    // Helper to detect Hebrew
+    function isHebrew(text) {
+      // If the entire word is in Hebrew range
+      return /^[\u0590-\u05FF]+$/.test(text);
+    }
+
+    // Helper to detect English
+    function isEnglish(text) {
+      // If the entire word has no Hebrew range characters
+      return !/[\u0590-\u05FF]/.test(text);
+    }
 
     addWordsBtn.addEventListener("click", async () => {
-      errorMsg.innerText = ""; // Clear previous error messages
-      const inputValue = newWordsInput.value.trim(); // Get input
+      errorMsg.innerText = "";
+      const inputValue = newWordsInput.value.trim();
+
+      // Check for RESET request
+      if (inputValue.toUpperCase() === "RESET DATABASE") {
+        if (confirm("Are you sure you want to reset both dictionaries?")) {
+          try {
+            // Reset English
+            await setDoc(doc(db, "dictionaries", "english"), { words: [] });
+            // Reset Hebrew
+            await setDoc(doc(db, "dictionaries", "hebrew"), { words: [] });
+            alert("Dictionaries have been reset!");
+          } catch (error) {
+            console.error("Error resetting database:", error);
+            errorMsg.innerText = "Failed to reset database. Check console for details.";
+          }
+        }
+        newWordsInput.value = "";
+        return;
+      }
 
       if (!inputValue) {
         alert("Please enter at least one word.");
@@ -174,33 +236,29 @@
       // Split and process input
       let newWords = inputValue.split(",").map(w => w.trim()).filter(Boolean);
 
-      // Separate into English and Hebrew
       let englishToAdd = [];
       let hebrewToAdd = [];
 
-      if (autoDetectCheckbox.checked) {
-        // Auto-detect language based on characters
-        newWords.forEach((word) => {
-          if (/[\u0590-\u05FF]/.test(word)) {
-            hebrewToAdd.push(word);
-          } else {
-            englishToAdd.push(word);
-          }
-        });
-      } else {
-        // Use selected language
-        const selectedLang = languageSelect.value;
-        if (selectedLang === "english") {
-          englishToAdd = newWords;
+      // Classify each word
+      for (let word of newWords) {
+        if (isHebrew(word)) {
+          hebrewToAdd.push(word);
+        } else if (isEnglish(word)) {
+          englishToAdd.push(word);
         } else {
-          hebrewToAdd = newWords;
+          // Mixed or unknown
+          errorMsg.innerText = `Error: the word "${word}" is mixed or invalid. No words added.`;
+          return;
         }
       }
 
       try {
+        // Make sure references exist
+        const englishRef = await ensureDictionaryExists("english");
+        const hebrewRef  = await ensureDictionaryExists("hebrew");
+
         // Add to English dictionary
         if (englishToAdd.length > 0) {
-          const englishRef = doc(db, "dictionaries", "english");
           await updateDoc(englishRef, {
             words: arrayUnion(...englishToAdd),
           });
@@ -209,7 +267,6 @@
 
         // Add to Hebrew dictionary
         if (hebrewToAdd.length > 0) {
-          const hebrewRef = doc(db, "dictionaries", "hebrew");
           await updateDoc(hebrewRef, {
             words: arrayUnion(...hebrewToAdd),
           });
