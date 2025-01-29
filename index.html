@@ -59,6 +59,7 @@
     }
     #wordsDisplay {
       margin-top: 20px;
+      /* Default left-align. We’ll switch to right-align (and rtl direction) in Hebrew mode. */
       text-align: left;
     }
     #errorMessage {
@@ -162,7 +163,7 @@
     };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-
+    
     /****************************************
      * 3) ELEMENT REFS                      *
      ****************************************/
@@ -178,11 +179,16 @@
     document.addEventListener("DOMContentLoaded", () => {
       const savedData = localStorage.getItem("lastDistribution");
       if (savedData) {
-        // If found, parse and display immediately
         try {
-          const { html } = JSON.parse(savedData);
+          const { html, language } = JSON.parse(savedData);
           if (html) {
+            // Insert saved HTML
             wordsDisplay.innerHTML = html;
+            // Restore alignment if Hebrew
+            if (language === "hebrew") {
+              wordsDisplay.style.direction = "rtl";
+              wordsDisplay.style.textAlign = "right";
+            }
             showAfterGenerationButtons();
           }
         } catch (err) {
@@ -209,7 +215,7 @@
       const namesList = userName
         .split(",")
         .map(n => n.trim())
-        .filter(Boolean); // remove empty entries
+        .filter(Boolean);
 
       if (namesList.length === 0) {
         errorMessage.textContent = "Please enter at least one valid name.";
@@ -246,51 +252,98 @@
         // 4) Shuffle dictionary
         const shuffled = [...wordArray].sort(() => 0.5 - Math.random());
 
-        // 5) If multiple names => unique words for each
-        // Each player gets 5 distinct words.
+        // 5) Each player gets 5 unique words
         const totalWordsNeeded = namesList.length * 5;
-
         if (shuffled.length < totalWordsNeeded) {
-          // Not enough words for unique distribution
-          // Option A: Show error
-          errorMessage.textContent = 
-            `Not enough words for ${namesList.length} player(s). 
-            Need ${totalWordsNeeded}, but only have ${shuffled.length}. 
-            Please add more words or reduce players.`;
+          errorMessage.textContent = `
+            Not enough words for ${namesList.length} player(s).
+            Need ${totalWordsNeeded} but only have ${shuffled.length}.
+            Please add more words or reduce players.
+          `;
           return;
+        }
 
-          // Option B (fallback to reuse):
-          // We'll skip this for now, since the request is to show an error or fallback
+        let currentIndex = 0;
+        let finalHTML = "";
+
+        // Optional: adjust alignment if Hebrew
+        if (selectedLanguage === "hebrew") {
+          wordsDisplay.style.direction = "rtl";
+          wordsDisplay.style.textAlign = "right";
+        } else {
+          // Reset in case previous session was Hebrew
+          wordsDisplay.style.direction = "ltr";
+          wordsDisplay.style.textAlign = "left";
         }
 
         // 6) Generate the distribution
-        let currentIndex = 0;
-        let finalHTML = ""; // We'll build HTML for all players here
+        if (namesList.length === 1) {
+          // Single player
+          const playerWords = shuffled.slice(0, 5);
 
-        for (const name of namesList) {
-          // Slice 5 words for this player
-          const playerWords = shuffled.slice(currentIndex, currentIndex + 5);
-          currentIndex += 5;
-
-          // Build the block of HTML for this player
           if (selectedLanguage === "english") {
-            finalHTML += `
+            finalHTML = `
               <div style="margin-bottom: 20px;">
-                <h2>Good Luck ${name}! <3</h2>
+                <h2>Good Luck ${namesList[0]}! <3</h2>
                 <p>These are your words for today:</p>
                 <p><em>${playerWords.join(" | ")}</em></p>
               </div>
-              <hr/>
             `;
           } else {
-            finalHTML += `
+            // Hebrew single player
+            finalHTML = `
               <div style="margin-bottom: 20px;">
-                <h2>בהצלחה ${name}!</h2>
+                <h2>בהצלחה ${namesList[0]}!</h2>
                 <p>המילים שלך הן...(איזה מתח איזה התרגשות באוויר וואי וואי תחזיקו אותי חזק):</p>
                 <p><em>${playerWords.join(" | ")}</em></p>
               </div>
+            `;
+          }
+
+        } else {
+          // Multiple players
+          if (selectedLanguage === "english") {
+            // Top message for all
+            finalHTML += `
+              <div style="margin-bottom: 20px;">
+                <h2>Good Luck Everyone! <3</h2>
+                <p>Below are your words for today (5 each):</p>
+              </div>
               <hr/>
             `;
+            // Then each player
+            for (const name of namesList) {
+              const playerWords = shuffled.slice(currentIndex, currentIndex + 5);
+              currentIndex += 5;
+              finalHTML += `
+                <div style="margin-bottom: 20px;">
+                  <h3>Good Luck ${name}!</h3>
+                  <p><em>${playerWords.join(" | ")}</em></p>
+                </div>
+                <hr/>
+              `;
+            }
+          } else {
+            // Hebrew multiple players
+            // Show that line only once at the top
+            finalHTML += `
+              <div style="margin-bottom: 20px;">
+                <h2>בהצלחה לכולם!</h2>
+                <p>המילים שלך הן...(איזה מתח איזה התרגשות באוויר וואי וואי תחזיקו אותי חזק):</p>
+              </div>
+              <hr/>
+            `;
+            for (const name of namesList) {
+              const playerWords = shuffled.slice(currentIndex, currentIndex + 5);
+              currentIndex += 5;
+              finalHTML += `
+                <div style="margin-bottom: 20px;">
+                  <h3>בהצלחה ${name}!</h3>
+                  <p><em>${playerWords.join(" | ")}</em></p>
+                </div>
+                <hr/>
+              `;
+            }
           }
         }
 
@@ -300,9 +353,10 @@
         // Show copy & print buttons
         showAfterGenerationButtons();
 
-        // 7) Save distribution to localStorage (for "history")
+        // 7) Save distribution + language to localStorage (for "history")
         const distributionData = {
-          html: finalHTML
+          html: finalHTML,
+          language: selectedLanguage
         };
         localStorage.setItem("lastDistribution", JSON.stringify(distributionData));
 
@@ -317,7 +371,6 @@
      ****************************************/
     copyAllBtn.addEventListener("click", async () => {
       try {
-        // Copy the text content (or you could copy HTML if desired)
         const textToCopy = wordsDisplay.innerText;
         await navigator.clipboard.writeText(textToCopy);
         alert("Copied all assigned words to clipboard!");
@@ -336,7 +389,6 @@
       copyAllBtn.style.display = "inline-block";
       printBtn.style.display = "inline-block";
     }
-
     function hideAfterGenerationButtons() {
       copyAllBtn.style.display = "none";
       printBtn.style.display = "none";
