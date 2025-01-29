@@ -59,6 +59,7 @@
     }
     #wordsDisplay {
       margin-top: 20px;
+      text-align: left;
     }
     #errorMessage {
       margin-top: 20px;
@@ -82,16 +83,32 @@
     .manage-link:hover {
       background-color: #e06b6b;
     }
+
+    /* Buttons that appear after generation */
+    .after-generation {
+      margin: 10px 5px 0 5px;
+      display: none; /* hidden by default, shown after assignment */
+    }
+
+    /* Print styling: hide form, manage link & special buttons */
+    @media print {
+      .manage-link, #copyAllBtn, #printBtn, #userForm {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Technion's Juniors Debate Game</h1>
 
-    <!-- USER FORM: Name + Language Selection -->
+    <!-- USER FORM: Name(s) + Language Selection -->
     <form id="userForm">
-      <label for="userName">Player's Name:</label>
-      <input type="text" id="userName" placeholder="Your name" required />
+      <label for="userName">Player's Name(s):</label>
+      <input type="text" id="userName" 
+        placeholder="Your name OR multiple names separated by commas" 
+        required 
+      />
 
       <label for="languageSelect">Select language:</label>
       <select id="languageSelect">
@@ -104,6 +121,10 @@
 
     <!-- Display random words -->
     <div id="wordsDisplay"></div>
+
+    <!-- Buttons for copy & print (shown after assignment) -->
+    <button id="copyAllBtn" class="after-generation">Copy All</button>
+    <button id="printBtn" class="after-generation">Print</button>
 
     <!-- Display on-screen errors -->
     <div id="errorMessage"></div>
@@ -131,84 +152,195 @@
      * 2) FIREBASE CONFIG + INIT            *
      ****************************************/
     const firebaseConfig = {
-      apiKey: "AIzaSyAayialkEZsC7rdYIm4k6lix4NLQZP9Qqg",
-      authDomain: "debategametechnion.firebaseapp.com",
-      projectId: "debategametechnion",
-      storageBucket: "debategametechnion.firebasestorage.app",
-      messagingSenderId: "1000572030639",
-      appId: "1:1000572030639:web:03f74e9c4006ba2e198e5a",
-      measurementId: "G-32MCCNDGFT"
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID",
+      measurementId: "YOUR_MEASUREMENT_ID"
     };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
     /****************************************
-     * 3) ELEMENT REFS + EVENT LISTENERS    *
+     * 3) ELEMENT REFS                      *
      ****************************************/
-    const userForm = document.getElementById("userForm");
+    const userForm     = document.getElementById("userForm");
     const wordsDisplay = document.getElementById("wordsDisplay");
     const errorMessage = document.getElementById("errorMessage");
+    const copyAllBtn   = document.getElementById("copyAllBtn");
+    const printBtn     = document.getElementById("printBtn");
 
+    /****************************************
+     * 4) RESTORE LAST DISTRIBUTION IF ANY  *
+     ****************************************/
+    document.addEventListener("DOMContentLoaded", () => {
+      const savedData = localStorage.getItem("lastDistribution");
+      if (savedData) {
+        // If found, parse and display immediately
+        try {
+          const { html } = JSON.parse(savedData);
+          if (html) {
+            wordsDisplay.innerHTML = html;
+            showAfterGenerationButtons();
+          }
+        } catch (err) {
+          console.warn("Failed to restore last distribution:", err);
+        }
+      }
+    });
+
+    /****************************************
+     * 5) MAIN FORM SUBMIT LOGIC            *
+     ****************************************/
     userForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       errorMessage.innerText = ""; // Clear old errors
       wordsDisplay.innerHTML = ""; // Clear old words
 
-      const userName = document.getElementById("userName").value.trim();
+      // Hide the "Copy All" and "Print" buttons until results generated
+      hideAfterGenerationButtons();
+
+      const userName         = document.getElementById("userName").value.trim();
       const selectedLanguage = document.getElementById("languageSelect").value;
 
+      // Split input on commas to detect group vs single
+      const namesList = userName
+        .split(",")
+        .map(n => n.trim())
+        .filter(Boolean); // remove empty entries
+
+      if (namesList.length === 0) {
+        errorMessage.textContent = "Please enter at least one valid name.";
+        return;
+      }
+
       try {
-        // 1) Reference the doc
+        // 1) Reference the doc in Firestore
         const docRef = doc(db, "dictionaries", selectedLanguage);
 
         // 2) Get the doc
         const docSnap = await getDoc(docRef);
 
         if (!docSnap.exists()) {
-          // If doc is missing, show an error
-          const msg = `No dictionary found for language: ${selectedLanguage}. 
+          const msg = `No dictionary found for language: ${selectedLanguage}.
             (Try visiting Manage Dictionaries to initialize.)`;
           console.error(msg);
           errorMessage.textContent = msg;
           return;
         }
 
-        // 3) Extract words
+        // 3) Extract words from DB
         const data = docSnap.data();
         const wordArray = data.words || [];
 
         if (wordArray.length === 0) {
-          // No words found
           wordsDisplay.innerHTML = `
-            <h2>Good luck, ${userName}!</h2>
+            <h2>Good luck, ${namesList.join(", ")}!</h2>
             <p>Oops, the <strong>${selectedLanguage}</strong> dictionary is empty!</p>
           `;
           return;
         }
 
-        // 4) Shuffle and get 5 random words
+        // 4) Shuffle dictionary
         const shuffled = [...wordArray].sort(() => 0.5 - Math.random());
-        const randomWords = shuffled.slice(0, 5);
 
-        // 5) Display based on language
-        if (selectedLanguage === "english") {
-          wordsDisplay.innerHTML = `
-            <h2>Good Luck ${userName}! <3</h2>
-            <p>These are your words for today:</p>
-            <p><em>${randomWords.join(" | ")}</em></p>
-          `;
-        } else if (selectedLanguage === "hebrew") {
-          wordsDisplay.innerHTML = `
-            <h2>בהצלחה ${userName}!</h2>
-            <p>המילים שלך הן...(איזה מתח איזה התרגשות באוויר וואי וואי תחזיקו אותי חזק):</p>
-            <p><em>${randomWords.join(" | ")}</em></p>
-          `;
+        // 5) If multiple names => unique words for each
+        // Each player gets 5 distinct words.
+        const totalWordsNeeded = namesList.length * 5;
+
+        if (shuffled.length < totalWordsNeeded) {
+          // Not enough words for unique distribution
+          // Option A: Show error
+          errorMessage.textContent = 
+            `Not enough words for ${namesList.length} player(s). 
+            Need ${totalWordsNeeded}, but only have ${shuffled.length}. 
+            Please add more words or reduce players.`;
+          return;
+
+          // Option B (fallback to reuse):
+          // We'll skip this for now, since the request is to show an error or fallback
         }
+
+        // 6) Generate the distribution
+        let currentIndex = 0;
+        let finalHTML = ""; // We'll build HTML for all players here
+
+        for (const name of namesList) {
+          // Slice 5 words for this player
+          const playerWords = shuffled.slice(currentIndex, currentIndex + 5);
+          currentIndex += 5;
+
+          // Build the block of HTML for this player
+          if (selectedLanguage === "english") {
+            finalHTML += `
+              <div style="margin-bottom: 20px;">
+                <h2>Good Luck ${name}! <3</h2>
+                <p>These are your words for today:</p>
+                <p><em>${playerWords.join(" | ")}</em></p>
+              </div>
+              <hr/>
+            `;
+          } else {
+            finalHTML += `
+              <div style="margin-bottom: 20px;">
+                <h2>בהצלחה ${name}!</h2>
+                <p>המילים שלך הן...(איזה מתח איזה התרגשות באוויר וואי וואי תחזיקו אותי חזק):</p>
+                <p><em>${playerWords.join(" | ")}</em></p>
+              </div>
+              <hr/>
+            `;
+          }
+        }
+
+        // Insert the final HTML distribution
+        wordsDisplay.innerHTML = finalHTML;
+
+        // Show copy & print buttons
+        showAfterGenerationButtons();
+
+        // 7) Save distribution to localStorage (for "history")
+        const distributionData = {
+          html: finalHTML
+        };
+        localStorage.setItem("lastDistribution", JSON.stringify(distributionData));
+
       } catch (error) {
         console.error("Error fetching dictionary:", error);
         errorMessage.textContent = "Failed to fetch words. Check console for details.";
       }
     });
+
+    /****************************************
+     * 6) COPY & PRINT BUTTONS              *
+     ****************************************/
+    copyAllBtn.addEventListener("click", async () => {
+      try {
+        // Copy the text content (or you could copy HTML if desired)
+        const textToCopy = wordsDisplay.innerText;
+        await navigator.clipboard.writeText(textToCopy);
+        alert("Copied all assigned words to clipboard!");
+      } catch (err) {
+        console.error("Failed to copy:", err);
+        alert("Failed to copy to clipboard.");
+      }
+    });
+
+    printBtn.addEventListener("click", () => {
+      window.print();
+    });
+
+    // Helper to show/hide these buttons
+    function showAfterGenerationButtons() {
+      copyAllBtn.style.display = "inline-block";
+      printBtn.style.display = "inline-block";
+    }
+
+    function hideAfterGenerationButtons() {
+      copyAllBtn.style.display = "none";
+      printBtn.style.display = "none";
+    }
   </script>
 </body>
 </html>
